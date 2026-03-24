@@ -424,3 +424,10 @@ void createButton() {
   }
   TTF_CloseFont(font);
 }
+
+void createHistogram() {
+  g_hist.rect.w = 280;
+  g_hist.rect.h = 200;
+  g_hist.rect.x = (float)DEFAULT_WINDOW_CHILD_WIDTH / 2.0f - (float)g_hist.rect.w / 2.0f;
+  g_hist.rect.y = (float)DEFAULT_WINDOW_CHILD_HEIGHT / 2.0f - (float)g_hist.rect.h/ 1.7f; 
+}
