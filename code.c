@@ -307,4 +307,21 @@ bool isGrayScale(SDL_Surface *surface) {
   SDL_UnlockSurface(surface);
   return(true);
 }
+void convertToGray(SDL_Surface *surface) {
+    SDL_Log("<<< convertToGray()");
+    if (!surface) return;
+    SDL_LockSurface(surface);
+    Uint32 *pixel = (Uint32*)surface->pixels;
+    int size = surface->w*surface->h;
+    const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
 
+    for (int i=0;i<size;i++) {
+        Uint8 r,g,b,a;
+        SDL_GetRGBA(pixel[i],format,NULL,&r,&g,&b,&a);
+        double y = 0.2125*(double)r+0.7154*(double)g+0.0721*(double)b;
+        Uint8 gray = (Uint8)y;
+        pixel[i] = SDL_MapRGBA(format,NULL,gray,gray,gray,a);
+    }
+    SDL_UnlockSurface(surface);
+    SDL_Log(">>> convertToGray()");
+}
