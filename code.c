@@ -349,3 +349,14 @@ void loadImage(const char *filename, SDL_Renderer *renderer, MyImage *output_ima
   analyzeImage(output_image->surface);
   SDL_Log("<<< load_rgba32(\"%s\")", filename);
 }
+
+void createTextureSurface(SDL_Renderer *renderer) {
+  SDL_Surface *surface_to_use = equalized ? equalizedSurface : originalSurface;
+  if (!surface_to_use) return;
+  if(g_image.texture) {
+    SDL_DestroyTexture(g_image.texture);
+    g_image.texture = NULL;
+  }
+  g_image.texture = SDL_CreateTextureFromSurface(renderer, surface_to_use);
+  SDL_GetTextureSize(g_image.texture, &g_image.rect.w, &g_image.rect.h);
+}
