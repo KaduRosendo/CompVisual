@@ -360,3 +360,26 @@ void createTextureSurface(SDL_Renderer *renderer) {
   g_image.texture = SDL_CreateTextureFromSurface(renderer, surface_to_use);
   SDL_GetTextureSize(g_image.texture, &g_image.rect.w, &g_image.rect.h);
 }
+
+void toggleButtonText() {
+    SDL_Log("<<< toggleButtonText()");
+    if(strcmp(g_button.text, BUTTON_TEXT_EQUALIZE) == 0)
+      g_button.text = BUTTON_TEXT_ORIGINAL;
+    else
+      g_button.text = BUTTON_TEXT_EQUALIZE;
+      
+    if(g_button.text_texture) {
+      SDL_DestroyTexture(g_button.text_texture);
+      g_button.text_texture = NULL;
+    }
+    TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 15);
+    SDL_Surface *text_surface = TTF_RenderText_Blended(font, g_button.text, SDL_strlen(g_button.text), (SDL_Color){0,0,0,255});
+    if(text_surface) {
+      g_button.text_texture = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface);
+      g_button.text_w = (int)text_surface->w;
+      g_button.text_h = (int)text_surface->h;
+      SDL_DestroySurface(text_surface);
+    }
+    TTF_CloseFont(font);
+    SDL_Log(">>> toggleButtonText()");
+}
