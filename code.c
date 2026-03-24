@@ -288,3 +288,23 @@ void createWindow() {
     SDL_SyncWindow(g_window.window);
     SDL_SyncWindow(g_windowChild.window);
 }
+
+bool isGrayScale(SDL_Surface *surface) {
+  SDL_Log("<<< isGrayScale()");
+  SDL_LockSurface(surface);
+  Uint32 *pixel = (Uint32*)surface->pixels;
+  int size = surface->w*surface->h;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+
+  for(int i=0;i<size;i++) {
+    Uint8 r,g,b,a;
+    SDL_GetRGBA(pixel[i], format,NULL,&r,&g,&b,&a);
+    if(!(r==g && g==b)) {
+      SDL_UnlockSurface(surface);
+      return(false);
+    }
+  }
+  SDL_UnlockSurface(surface);
+  return(true);
+}
+
