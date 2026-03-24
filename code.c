@@ -307,6 +307,7 @@ bool isGrayScale(SDL_Surface *surface) {
   SDL_UnlockSurface(surface);
   return(true);
 }
+
 void convertToGray(SDL_Surface *surface) {
     SDL_Log("<<< convertToGray()");
     if (!surface) return;
@@ -324,4 +325,27 @@ void convertToGray(SDL_Surface *surface) {
     }
     SDL_UnlockSurface(surface);
     SDL_Log(">>> convertToGray()");
+}
+
+void loadImage(const char *filename, SDL_Renderer *renderer, MyImage *output_image) {
+  SDL_Log(">>> loadImage(\"%s\")", filename);
+  if (!filename || !renderer || !output_image) return;
+
+  MyImage_destroy(output_image);
+  SDL_Surface *surface = IMG_Load(filename);
+  if (!surface) return;
+
+  output_image->surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+  SDL_DestroySurface(surface);
+  
+  bool isGray = isGrayScale(output_image->surface);
+  if(!isGray) convertToGray(output_image->surface);
+  
+  countIntensity(output_image->surface);
+  originalSurface = SDL_ConvertSurface(output_image->surface, SDL_PIXELFORMAT_RGBA32);
+  equalizedSurface = NULL;
+  equalized = false;
+  createTextureSurface(renderer);
+  analyzeImage(output_image->surface);
+  SDL_Log("<<< load_rgba32(\"%s\")", filename);
 }
