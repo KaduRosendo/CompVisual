@@ -17,282 +17,161 @@ Joao Pedro Gianfaldoni - 10409524
 #include <SDL3_ttf/SDL_ttf.h>
 #include <math.h>
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+// Constants
+static const char *WINDOW_TITLE = "Tela Principal";
+static const char *WINDOW_TITLE2 = "Tela Secundária";
+static const char *BUTTON_TEXT_EQUALIZE = "Equalizar";
+static const char *BUTTON_TEXT_ORIGINAL = "Ver original";
+char *IMAGE_FILENAME;
+static const char *DEFAULT_OUTPUT_FILENAME = "output_image.png";
 
-// ================= STRUCTS =================
+enum constants {
+  DEFAULT_WINDOW_WIDTH = 0,
+  DEFAULT_WINDOW_HEIGHT = 0,
+  DEFAULT_WINDOW_CHILD_WIDTH = 320,
+  DEFAULT_WINDOW_CHILD_HEIGHT = 240,
+};
 
-typedef struct {
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-} MyWindow;
+typedef struct MyWindow MyWindow;
+struct MyWindow {
+  SDL_Window *window;
+  SDL_Renderer *renderer;
+};
 
-typedef struct {
-    SDL_Texture* texture;
-    int width;
-    int height;
-    Uint8* pixels;
-} MyImage;
+typedef struct MyImage MyImage;
+struct MyImage {
+  SDL_Surface *surface;
+  SDL_Texture *texture;
+  SDL_FRect rect;
+};
 
-typedef struct {
-    SDL_Rect rect;
-    const char* text;
-    bool isHovered;
-} Button;
+typedef struct Button Button;
+struct Button {
+    SDL_FRect rect;
+    SDL_Color color_normal;
+    SDL_Color color_hover;
+    SDL_Color color_pressed;
+    
+    const char *text;
+    SDL_Texture *text_texture;
+    int text_w;
+    int text_h;
+    
+    bool is_hovered;
+    bool is_pressed;
+    bool was_clicked;
+};
 
-// ================= VARIÁVEIS GLOBAIS =================
+typedef struct Histogram Histogram;
+struct Histogram {
+    SDL_FRect rect;
+};
 
-MyWindow mainWindow;
-bool isEqualized = false;
+// Global variables
+float counterIntensity[256];
+float counterIntensityEqualized[256];
+bool equalized = false;
+SDL_FRect histBars[256];
+SDL_Surface *originalSurface;
+SDL_Surface *equalizedSurface;
+char *contrast;
+char *brightness;
 
-// ================= FUNÇÕES DE JANELA =================
+static MyWindow g_window = { .window = NULL, .renderer = NULL };
+static MyWindow g_windowChild = {.window = NULL, .renderer = NULL};
+static MyImage g_image = {
+  .surface = NULL,
+  .texture = NULL,
+  .rect = { .x = 0.0f, .y = 0.0f, .w = 0.0f, .h = 0.0f }
+};
+static Button g_button = {
+    .rect = {0, 0, 0, 0},
+    .color_normal = {0, 0, 0, 0},
+    .color_hover  = {0, 0, 0, 0},
+    .color_pressed = {0, 0, 0, 0},
+    .text = NULL,
+    .text_texture = NULL,
+    .text_w = 0,
+    .text_h = 0,
+    .is_hovered = false,
+    .is_pressed = false,
+    .was_clicked = false
+};
+static Histogram g_hist = { .rect = {0,0,0,0} };
 
-int initialize() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("Erro ao inicializar SDL\n");
-        return 0;
-    }
+// Function declarations
+static bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags);
+static void MyWindow_destroy(MyWindow *window);
+static void MyImage_destroy(MyImage *image);
+static void createButton();
+static void renderButton();
+static void toggleButtonText();
+static void loadHistogramButton();
+static SDL_AppResult initialize();
+static void loadImage(const char *filename, SDL_Renderer *renderer, MyImage *output_image);
+static void render();
+static void createHistogram();
+static void renderHistogramBars();
+static void countIntensity(SDL_Surface *surface);
+static void equalize(SDL_Surface *surface);
+static void createTextureSurface(SDL_Renderer *renderer);
+static void analyzeImage(SDL_Surface *surface);
+static void renderImageStats();
 
-    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
-        printf("Erro ao inicializar SDL_image\n");
-        return 0;
-    }
+// Function implementations
 
-    if (TTF_Init() == -1) {
-        printf("Erro ao inicializar SDL_ttf\n");
-        return 0;
-    }
-
-    return 1;
+bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags) {
+  SDL_Log("\tMyWindow_initialize(%s, %d, %d)", title, width, height);
+  return SDL_CreateWindowAndRenderer(title, width, height, window_flags, &window->window, &window->renderer);
 }
 
-void shutdown() {
-    TTF_Quit();
-    IMG_Quit();
-    SDL_Quit();
+void MyWindow_destroy(MyWindow *window) {
+  SDL_Log(">>> MyWindow_destroy()");
+  SDL_Log("\tDestruindo MyWindow->renderer...");
+  SDL_DestroyRenderer(window->renderer);
+  window->renderer = NULL;
+  SDL_Log("\tDestruindo MyWindow->window...");
+  SDL_DestroyWindow(window->window);
+  window->window = NULL;
+  SDL_Log("<<< MyWindow_destroy()");
 }
 
-int createWindow(MyWindow* win, const char* title, int w, int h) {
-    win->window = SDL_CreateWindow(title, w, h, 0);
-    if (!win->window) {
-        printf("Erro ao criar janela\n");
-        return 0;
-    }
-
-    win->renderer = SDL_CreateRenderer(win->window, NULL);
-    if (!win->renderer) {
-        printf("Erro ao criar renderer\n");
-        return 0;
-    }
-
-    return 1;
-}
-
-void MyWindow_destroy(MyWindow* win) {
-    SDL_DestroyRenderer(win->renderer);
-    SDL_DestroyWindow(win->window);
-}
-
-// ================= ANÁLISE DE IMAGEM =================
-
-void analyzeImage(Uint8* pixels, int totalPixels, float* media, float* desvio) {
-    long soma = 0;
-    long somaQuadrados = 0;
-
-    for (int i = 0; i < totalPixels; i++) {
-        soma += pixels[i];
-        somaQuadrados += pixels[i] * pixels[i];
-    }
-
-    *media = (float)soma / totalPixels;
-
-    float variancia = ((float)somaQuadrados / totalPixels) - (*media * *media);
-    *desvio = sqrt(variancia);
-}
-
-void renderImageStats(float media, float desvio) {
-    printf("Brilho (media): %.2f\n", media);
-    printf("Contraste (desvio): %.2f\n", desvio);
-
-    if (media < 85)
-        printf("Imagem Escura\n");
-    else if (media < 170)
-        printf("Imagem Média\n");
-    else
-        printf("Imagem Clara\n");
-
-    if (desvio < 50)
-        printf("Contraste Baixo\n");
-    else if (desvio < 100)
-        printf("Contraste Médio\n");
-    else
-        printf("Contraste Alto\n");
-}
-
-// ================= BOTÃO =================
-
-void toggleButtonText(Button* btn) {
-    if (isEqualized) {
-        btn->text = "Ver Original";
-    }
-    else {
-        btn->text = "Equalizar";
-    }
-}
-
-// ================= MAIN =================
-
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Uso: ./main <imagem>\n");
-        return 1;
-    }
-
-    if (!initialize()) {
-        return 1;
-    }
-
-    if (!createWindow(&mainWindow, "Visualizador", WINDOW_WIDTH, WINDOW_HEIGHT)) {
-        return 1;
-    }
-
-    bool running = true;
-    SDL_Event event;
-
-    Button btn;
-    btn.rect = (SDL_Rect){ 50, 50, 200, 50 };
-    btn.text = "Equalizar";
-
-    // Simulação (substituir pelos pixels reais depois)
-    Uint8 fakePixels[1000];
-    for (int i = 0; i < 1000; i++) {
-        fakePixels[i] = rand() % 256;
-    }
-
-    float media, desvio;
-    analyzeImage(fakePixels, 1000, &media, &desvio);
-    renderImageStats(media, desvio);
-
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                int x = event.button.x;
-                int y = event.button.y;
-
-                if (x >= btn.rect.x && x <= btn.rect.x + btn.rect.w &&
-                    y >= btn.rect.y && y <= btn.rect.y + btn.rect.h) {
-
-                    isEqualized = !isEqualized;
-                    toggleButtonText(&btn);
-                }
-            }
-        }
-
-        SDL_SetRenderDrawColor(mainWindow.renderer, 255, 255, 255, 255);
-        SDL_RenderClear(mainWindow.renderer);
-
-        // Desenha botão
-        SDL_SetRenderDrawColor(mainWindow.renderer, 200, 200, 200, 255);
-        SDL_RenderFillRect(mainWindow.renderer, &btn.rect);
-
-        SDL_RenderPresent(mainWindow.renderer);
-    }
-
-    MyWindow_destroy(&mainWindow);
-    shutdown();
-
-    return 0;
-}
-
-
-static void render(void) {
-  SDL_SetRenderDrawColor(g_window.renderer, 128, 128, 128, 255);
-  SDL_RenderClear(g_window.renderer);
-  SDL_RenderTexture(g_window.renderer, g_image.texture, &g_image.rect, &g_image.rect);
-  SDL_RenderPresent(g_window.renderer);
-
-  SDL_SetRenderDrawColor(g_windowChild.renderer, 128, 128, 128, 255);
-  SDL_RenderClear(g_windowChild.renderer);
-  renderButton();
-  renderHistogramBars();
-  renderImageStats();
-  SDL_RenderPresent(g_windowChild.renderer);
-}
-
-static void loop(void) {
-  SDL_Log(">>> loop()");
-  SDL_Cursor *cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
-  SDL_Cursor *cursor_hand  = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
-  bool mustRefresh = false;
-  render();
-  SDL_Event event;
-  bool isRunning = true;
-
-  while(isRunning) {
-    float mouse_x_global, mouse_y_global;
-    SDL_GetGlobalMouseState(&mouse_x_global, &mouse_y_global);
-    int child_x, child_y;
-    SDL_GetWindowPosition(g_windowChild.window, &child_x, &child_y);
-    int mouse_x = mouse_x_global - child_x;
-    int mouse_y = mouse_y_global - child_y;
-    bool hovering = (mouse_x>=g_button.rect.x && mouse_x<=g_button.rect.x+g_button.rect.w &&
-                     mouse_y>=g_button.rect.y && mouse_y<=g_button.rect.y+g_button.rect.h);
-    if(hovering!=g_button.is_hovered) {
-      g_button.is_hovered = hovering;
-      SDL_SetCursor(hovering?cursor_hand:cursor_arrow);
-      mustRefresh = true;
-    }
-
- if(g_button.was_clicked) {
-      toggleButtonText();
-      equalized = !equalized;
-      if(equalized){
-        equalize(g_image.surface);
-        countIntensity(equalizedSurface);
-      } else {
-        g_image.surface = SDL_ConvertSurface(originalSurface, SDL_PIXELFORMAT_RGBA32);
-        countIntensity(originalSurface);
-      }
-      createTextureSurface(g_window.renderer);
-      g_button.was_clicked = false;
-      mustRefresh = true;
-    }
-    while(SDL_PollEvent(&event)) {
-      switch(event.type) {
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-          if(event.window.windowID == SDL_GetWindowID(g_window.window) || event.window.windowID == SDL_GetWindowID(g_windowChild.window))
-            isRunning = false;
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-          if(g_button.is_hovered) {
-            g_button.is_pressed = true; mustRefresh = true;
-          }
-          break;
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-          if(g_button.is_pressed && g_button.is_hovered) {
-            g_button.was_clicked = true; g_button.is_pressed = false; mustRefresh = true;
-          }
-          break;
-        case SDL_EVENT_KEY_DOWN:
-          if(event.key.key == SDLK_S){
-            SDL_ClearError();
-            if (!IMG_SavePNG(g_image.surface, DEFAULT_OUTPUT_FILENAME)) {
-              SDL_Log("Erro ao salvar a imagem: %s", SDL_GetError());
-            } else {
-              SDL_Log("Imagem salva como %s", DEFAULT_OUTPUT_FILENAME);
-            }
-          }
-          break;
-      }
-    }
-    if(mustRefresh) { render(); mustRefresh = false; }
-    SDL_Delay(10);
+void MyImage_destroy(MyImage *image) {
+  SDL_Log(">>> MyImage_destroy()");
+  if (!image) return;
+  if (image->texture) {
+    SDL_DestroyTexture(image->texture);
+    image->texture = NULL;
   }
-  SDL_DestroyCursor(cursor_arrow);
-  SDL_DestroyCursor(cursor_hand);
-  SDL_Log("<<< loop()");
+  if (image->surface) {
+    SDL_DestroySurface(image->surface);
+    image->surface = NULL;
+  }
+  image->rect.x = image->rect.y = image->rect.w = image->rect.h = 0.0f;
+  SDL_Log("<<< MyImage_destroy()");
+}
+
+static SDL_AppResult initialize(void) {
+  SDL_Log(">>> initialize()");
+  for(int i=0;i<256;i++){
+    counterIntensity[i]=0;
+    counterIntensityEqualized[i]=0;
+  }
+  if (!SDL_Init(SDL_INIT_VIDEO)) return SDL_APP_FAILURE;
+  if (!MyWindow_initialize(&g_window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) return SDL_APP_FAILURE;
+  if (!MyWindow_initialize(&g_windowChild, WINDOW_TITLE2, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) return SDL_APP_FAILURE;
+  if(!SDL_SetWindowParent(g_windowChild.window, g_window.window)) return SDL_APP_FAILURE;
+  if(!TTF_Init()) return SDL_APP_FAILURE;
+  
+  SDL_Log("<<< initialize()");
+  return SDL_APP_CONTINUE;
+}
+
+static void shutdown(void) {
+  SDL_Log(">>> shutdown()");
+  MyImage_destroy(&g_image);
+  MyWindow_destroy(&g_window);
+  MyWindow_destroy(&g_windowChild);
+  SDL_Quit();
+  SDL_Log("<<< shutdown()");
 }
