@@ -383,3 +383,26 @@ void toggleButtonText() {
     TTF_CloseFont(font);
     SDL_Log(">>> toggleButtonText()");
 }
+
+void renderButton() {
+  SDL_Color current_color = g_button.color_normal;
+  if(g_button.is_pressed) current_color = g_button.color_pressed;
+  else if(g_button.is_hovered) current_color = g_button.color_hover;
+  
+  if(g_button.text_texture) {
+    int padding_x = 15; int padding_y = 5;
+    int window_w, window_h;
+    SDL_GetWindowSize(g_windowChild.window, &window_w, &window_h);
+    SDL_FRect text_bg = {
+      (window_w - (g_button.text_w + 2*padding_x)) / 2.0f,
+      window_h - (g_button.text_h + 2*padding_y) - 5,
+      g_button.text_w + 2*padding_x,
+      g_button.text_h + 2*padding_y
+    };
+    g_button.rect = text_bg;
+    SDL_SetRenderDrawColor(g_windowChild.renderer, current_color.r, current_color.g, current_color.b, current_color.a);
+    SDL_RenderFillRect(g_windowChild.renderer, &text_bg);
+    SDL_FRect text_rect = { text_bg.x + padding_x, text_bg.y + padding_y, g_button.text_w, g_button.text_h };
+    SDL_RenderTexture(g_windowChild.renderer, g_button.text_texture, NULL, &text_rect);
+  }
+}
