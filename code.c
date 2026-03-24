@@ -175,3 +175,116 @@ static void shutdown(void) {
   SDL_Quit();
   SDL_Log("<<< shutdown()");
 }
+
+static void render(void) {
+  SDL_SetRenderDrawColor(g_window.renderer, 128, 128, 128, 255);
+  SDL_RenderClear(g_window.renderer);
+  SDL_RenderTexture(g_window.renderer, g_image.texture, &g_image.rect, &g_image.rect);
+  SDL_RenderPresent(g_window.renderer);
+
+  SDL_SetRenderDrawColor(g_windowChild.renderer, 128, 128, 128, 255);
+  SDL_RenderClear(g_windowChild.renderer);
+  renderButton();
+  renderHistogramBars();
+  renderImageStats();
+  SDL_RenderPresent(g_windowChild.renderer);
+}
+
+static void loop(void) {
+  SDL_Log(">>> loop()");
+  SDL_Cursor *cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+  SDL_Cursor *cursor_hand  = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
+  bool mustRefresh = false;
+  render();
+  SDL_Event event;
+  bool isRunning = true;
+
+  while(isRunning) {
+    float mouse_x_global, mouse_y_global;
+    SDL_GetGlobalMouseState(&mouse_x_global, &mouse_y_global);
+    int child_x, child_y;
+    SDL_GetWindowPosition(g_windowChild.window, &child_x, &child_y);
+    int mouse_x = mouse_x_global - child_x;
+    int mouse_y = mouse_y_global - child_y;
+    bool hovering = (mouse_x>=g_button.rect.x && mouse_x<=g_button.rect.x+g_button.rect.w &&
+                     mouse_y>=g_button.rect.y && mouse_y<=g_button.rect.y+g_button.rect.h);
+    if(hovering!=g_button.is_hovered) {
+      g_button.is_hovered = hovering;
+      SDL_SetCursor(hovering?cursor_hand:cursor_arrow);
+      mustRefresh = true;
+    }
+    if(g_button.was_clicked) {
+      toggleButtonText();
+      equalized = !equalized;
+      if(equalized){
+        equalize(g_image.surface);
+        countIntensity(equalizedSurface);
+      } else {
+        g_image.surface = SDL_ConvertSurface(originalSurface, SDL_PIXELFORMAT_RGBA32);
+        countIntensity(originalSurface);
+      }
+      createTextureSurface(g_window.renderer);
+      g_button.was_clicked = false;
+      mustRefresh = true;
+    }
+    while(SDL_PollEvent(&event)) {
+      switch(event.type) {
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+          if(event.window.windowID == SDL_GetWindowID(g_window.window) || event.window.windowID == SDL_GetWindowID(g_windowChild.window))
+            isRunning = false;
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+          if(g_button.is_hovered) {
+            g_button.is_pressed = true; mustRefresh = true;
+          }
+          break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+          if(g_button.is_pressed && g_button.is_hovered) {
+            g_button.was_clicked = true; g_button.is_pressed = false; mustRefresh = true;
+          }
+          break;
+        case SDL_EVENT_KEY_DOWN:
+          if(event.key.key == SDLK_S){
+            SDL_ClearError();
+            if (!IMG_SavePNG(g_image.surface, DEFAULT_OUTPUT_FILENAME)) {
+              SDL_Log("Erro ao salvar a imagem: %s", SDL_GetError());
+            } else {
+              SDL_Log("Imagem salva como %s", DEFAULT_OUTPUT_FILENAME);
+            }
+          }
+          break;
+      }
+    }
+    if(mustRefresh) { render(); mustRefresh = false; }
+    SDL_Delay(10);
+  }
+  SDL_DestroyCursor(cursor_arrow);
+  SDL_DestroyCursor(cursor_hand);
+  SDL_Log("<<< loop()");
+}
+
+void createWindow() {
+    int imageWidth = (int)g_image.rect.w;
+    int imageHeight = (int)g_image.rect.h;
+    int imageWidthChild = DEFAULT_WINDOW_CHILD_WIDTH;
+    int imageWidthHeight = DEFAULT_WINDOW_CHILD_HEIGHT;
+    
+    if (imageWidth > DEFAULT_WINDOW_WIDTH || imageHeight > DEFAULT_WINDOW_HEIGHT) {
+      int top = 0; int left = 0;
+      SDL_GetWindowBordersSize(g_window.window, &top, &left, NULL, NULL);
+      SDL_SetWindowSize(g_window.window, imageWidth, imageHeight);
+      SDL_SetWindowPosition(g_window.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
+
+    SDL_SetWindowSize(g_windowChild.window, imageWidthChild, imageWidthHeight);
+
+    int main_x, main_y, main_w, main_h;
+    SDL_GetWindowPosition(g_window.window, &main_x, &main_y);
+    SDL_GetWindowSize(g_window.window, &main_w, &main_h);
+    int side_x = main_x + main_w + 10;
+    int side_y = main_y;
+    SDL_SetWindowPosition(g_windowChild.window, side_x, side_y);
+
+    SDL_SyncWindow(g_window.window);
+    SDL_SyncWindow(g_windowChild.window);
+}
