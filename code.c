@@ -406,3 +406,21 @@ void renderButton() {
     SDL_RenderTexture(g_windowChild.renderer, g_button.text_texture, NULL, &text_rect);
   }
 }
+
+void createButton() {
+  TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 15);
+  if(!font) return;
+  g_button.color_normal = (SDL_Color){0, 77, 156, 255}; 
+  g_button.color_hover = (SDL_Color){183, 219, 255, 255};  
+  g_button.color_pressed = (SDL_Color){17, 59, 102, 255};   
+  g_button.text = BUTTON_TEXT_EQUALIZE;
+  
+  SDL_Surface *text_surface = TTF_RenderText_Blended(font, g_button.text, SDL_strlen(g_button.text), (SDL_Color){0, 0, 0, 255});
+  if(text_surface) {
+    g_button.text_texture = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface);
+    g_button.text_w = (int)text_surface->w;
+    g_button.text_h = (int)text_surface->h;
+    SDL_DestroySurface(text_surface);
+  }
+  TTF_CloseFont(font);
+}
