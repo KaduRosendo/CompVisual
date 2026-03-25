@@ -457,3 +457,19 @@ void renderHistogramBars() {
   SDL_RenderLine(g_windowChild.renderer, g_hist.rect.x, base_y, g_hist.rect.x + g_hist.rect.w, base_y);
   SDL_RenderLine(g_windowChild.renderer, g_hist.rect.x, g_hist.rect.y, g_hist.rect.x, base_y);
 }
+
+
+void equalize(SDL_Surface *surface) {
+  if (!surface) return;
+  SDL_LockSurface(surface);
+  Uint32 *pixel = (Uint32*)surface->pixels;
+  int size = surface->w * surface->h;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+
+  int hist[256] = {0};
+  for(int i=0;i<size;i++) {
+    Uint8 r,g,b,a;
+    SDL_GetRGBA(pixel[i], format, NULL, &r, &g, &b, &a);
+    hist[r]++; 
+  }
+
