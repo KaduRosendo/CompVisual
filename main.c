@@ -133,30 +133,66 @@ void MyWindow_destroy(MyWindow *window) {
 
 void MyImage_destroy(MyImage *image) {
   SDL_Log(">>> MyImage_destroy()");
-  if (!image) return;
+  if (!image) {
+    SDL_Log("\t*** Erro: Imagem inválida (image == NULL).");
+    SDL_Log("<<< MyImage_destroy()");
+    return;
+  }
   if (image->texture) {
+    SDL_Log("\tDestruindo MyImage->texture...");
     SDL_DestroyTexture(image->texture);
     image->texture = NULL;
   }
   if (image->surface) {
+    SDL_Log("\tDestruindo MyImage->surface...");
     SDL_DestroySurface(image->surface);
     image->surface = NULL;
   }
+  SDL_Log("\tRedefinindo MyImage->rect...");
   image->rect.x = image->rect.y = image->rect.w = image->rect.h = 0.0f;
   SDL_Log("<<< MyImage_destroy()");
 }
 
 static SDL_AppResult initialize(void) {
   SDL_Log(">>> initialize()");
+  SDL_Log("Inicializando variáveis...");
   for(int i=0;i<256;i++){
     counterIntensity[i]=0;
     counterIntensityEqualized[i]=0;
   }
-  if (!SDL_Init(SDL_INIT_VIDEO)) return SDL_APP_FAILURE;
-  if (!MyWindow_initialize(&g_window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) return SDL_APP_FAILURE;
-  if (!MyWindow_initialize(&g_windowChild, WINDOW_TITLE2, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) return SDL_APP_FAILURE;
-  if(!SDL_SetWindowParent(g_windowChild.window, g_window.window)) return SDL_APP_FAILURE;
-  if(!TTF_Init()) return SDL_APP_FAILURE;
+  
+  SDL_Log("\tIniciando SDL...");
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    SDL_Log("\t*** Erro ao iniciar a SDL: %s", SDL_GetError());
+    SDL_Log("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+  
+  SDL_Log("\tCriando janela e renderizador...");
+  if (!MyWindow_initialize(&g_window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) {
+    SDL_Log("\tErro ao criar a janela e/ou renderizador: %s", SDL_GetError());
+    SDL_Log("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+  
+  SDL_Log("\tCriando janela filho e renderizador...");
+  if (!MyWindow_initialize(&g_windowChild, WINDOW_TITLE2, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0)) {
+    SDL_Log("\tErro ao criar a janela filho e/ou renderizador: %s", SDL_GetError());
+    SDL_Log("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+  
+  if(!SDL_SetWindowParent(g_windowChild.window, g_window.window)) {
+    SDL_Log("\tErro setar parentesco entre a janela filho e pai: %s", SDL_GetError());
+    SDL_Log("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+  
+  if(!TTF_Init()) {
+    SDL_Log("\t*** Erro ao inicializar SDL_ttf: %s", SDL_GetError());
+    SDL_Log("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
   
   SDL_Log("<<< initialize()");
   return SDL_APP_CONTINUE;
@@ -167,6 +203,7 @@ static void shutdown(void) {
   MyImage_destroy(&g_image);
   MyWindow_destroy(&g_window);
   MyWindow_destroy(&g_windowChild);
+  SDL_Log("\tEncerrando SDL...");
   SDL_Quit();
   SDL_Log("<<< shutdown()");
 }
@@ -267,6 +304,8 @@ void createWindow() {
     if (imageWidth > DEFAULT_WINDOW_WIDTH || imageHeight > DEFAULT_WINDOW_HEIGHT) {
       int top = 0; int left = 0;
       SDL_GetWindowBordersSize(g_window.window, &top, &left, NULL, NULL);
+      SDL_Log("Redefinindo dimensões da janela, de (%d, %d) para (%d, %d), e alterando a posição para (%d, %d).",
+      DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, imageWidth, imageHeight, left, top);
       SDL_SetWindowSize(g_window.window, imageWidth, imageHeight);
       SDL_SetWindowPosition(g_window.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
@@ -299,6 +338,7 @@ bool isGrayScale(SDL_Surface *surface) {
       return(false);
     }
   }
+  SDL_Log("<<< isGrayScale()");
   SDL_UnlockSurface(surface);
   return(true);
 }
@@ -324,16 +364,46 @@ void convertToGray(SDL_Surface *surface) {
 
 void loadImage(const char *filename, SDL_Renderer *renderer, MyImage *output_image) {
   SDL_Log(">>> loadImage(\"%s\")", filename);
-  if (!filename || !renderer || !output_image) return;
+  if (!filename) {
+    SDL_Log("\t*** Erro: Nome do arquivo inválido (filename == NULL).");
+    SDL_Log("<<< loadImage(\"%s\")", filename);
+    return;
+  }
+  
+  if (!renderer) {
+    SDL_Log("\t*** Erro: Renderer inválido (renderer == NULL).");
+    SDL_Log("<<< loadImage(\"%s\")", filename);
+    return;
+  }
+  
+  if (!output_image) {
+    SDL_Log("\t*** Erro: Imagem de saída inválida (output_image == NULL).");
+    SDL_Log("<<< loadImage(\"%s\")", filename);
+    return;
+  }
 
   MyImage_destroy(output_image);
+  
+  SDL_Log("\tCarregando imagem \"%s\" em uma superfície...", filename);
   SDL_Surface *surface = IMG_Load(filename);
-  if (!surface) return;
+  if (!surface) {
+    SDL_Log("\t*** Erro ao carregar a imagem: %s", SDL_GetError());
+    SDL_Log("<<< loadImage(\"%s\")", filename);
+    return;
+  }
 
+  SDL_Log("\tConvertendo superfície para formato RGBA32...");
   output_image->surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
   SDL_DestroySurface(surface);
+  if (!output_image->surface) {
+    SDL_Log("\t*** Erro ao converter superfície para formato RGBA32: %s", SDL_GetError());
+    SDL_Log("<<< load_rgba32(\"%s\")", filename);
+    return;
+  }
   
   bool isGray = isGrayScale(output_image->surface);
+  isGrayScale(output_image->surface) ? SDL_Log("\tÉ cinza") : SDL_Log("\tÉ colorida");
+  
   if(!isGray) convertToGray(output_image->surface);
   
   countIntensity(output_image->surface);
@@ -347,12 +417,19 @@ void loadImage(const char *filename, SDL_Renderer *renderer, MyImage *output_ima
 
 void createTextureSurface(SDL_Renderer *renderer) {
   SDL_Surface *surface_to_use = equalized ? equalizedSurface : originalSurface;
-  if (!surface_to_use) return;
+  if (!surface_to_use) {
+    SDL_Log("*** Erro: Superfície para criar textura é NULL.");
+    return;
+  }
   if(g_image.texture) {
     SDL_DestroyTexture(g_image.texture);
     g_image.texture = NULL;
   }
   g_image.texture = SDL_CreateTextureFromSurface(renderer, surface_to_use);
+  if (!g_image.texture) {
+    SDL_Log("*** Erro ao criar textura: %s", SDL_GetError());
+  }
+  SDL_Log("\tObtendo dimensões da textura...");
   SDL_GetTextureSize(g_image.texture, &g_image.rect.w, &g_image.rect.h);
 }
 
@@ -368,18 +445,26 @@ void toggleButtonText() {
       g_button.text_texture = NULL;
     }
     TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 15);
+    if (!font) {
+      SDL_Log("Erro ao carregar fonte: %s", SDL_GetError());
+    }
     SDL_Surface *text_surface = TTF_RenderText_Blended(font, g_button.text, SDL_strlen(g_button.text), (SDL_Color){0,0,0,255});
     if(text_surface) {
       g_button.text_texture = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface);
       g_button.text_w = (int)text_surface->w;
       g_button.text_h = (int)text_surface->h;
       SDL_DestroySurface(text_surface);
+    } else {
+      g_button.text_texture = NULL;
+      g_button.text_w = g_button.text_h = 0;
+      SDL_Log("*** Erro ao criar a superfície do texto: %s", SDL_GetError());
     }
     TTF_CloseFont(font);
     SDL_Log(">>> toggleButtonText()");
 }
 
 void renderButton() {
+  SDL_Log("<<< renderButton()");
   SDL_Color current_color = g_button.color_normal;
   if(g_button.is_pressed) current_color = g_button.color_pressed;
   else if(g_button.is_hovered) current_color = g_button.color_hover;
@@ -400,11 +485,16 @@ void renderButton() {
     SDL_FRect text_rect = { text_bg.x + padding_x, text_bg.y + padding_y, g_button.text_w, g_button.text_h };
     SDL_RenderTexture(g_windowChild.renderer, g_button.text_texture, NULL, &text_rect);
   }
+  SDL_Log(">>> renderButton()");
 }
 
 void createButton() {
+  SDL_Log("<<< createButton()");
   TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 15);
-  if(!font) return;
+  if(!font) {
+    SDL_Log("*** Erro ao abrir fonte: %s", SDL_GetError());
+    return;
+  }
   g_button.color_normal = (SDL_Color){0, 77, 156, 255}; 
   g_button.color_hover = (SDL_Color){183, 219, 255, 255};  
   g_button.color_pressed = (SDL_Color){17, 59, 102, 255};   
@@ -416,18 +506,27 @@ void createButton() {
     g_button.text_w = (int)text_surface->w;
     g_button.text_h = (int)text_surface->h;
     SDL_DestroySurface(text_surface);
+  } else {
+    g_button.text_texture = NULL;
+    g_button.text_w = 0;
+    g_button.text_h = 0;
+    SDL_Log("*** Erro ao criar a superfície do texto: %s", SDL_GetError());
   }
   TTF_CloseFont(font);
+  SDL_Log(">>> createButton()");
 }
 
 void createHistogram() {
+  SDL_Log("<<< createHistogram()");
   g_hist.rect.w = 280;
   g_hist.rect.h = 200;
   g_hist.rect.x = (float)DEFAULT_WINDOW_CHILD_WIDTH / 2.0f - (float)g_hist.rect.w / 2.0f;
   g_hist.rect.y = (float)DEFAULT_WINDOW_CHILD_HEIGHT / 2.0f - (float)g_hist.rect.h/ 1.7f; 
+  SDL_Log(">>> createHistogram()");
 }
 
 void renderHistogramBars() {
+  SDL_Log("<<< renderHistogramBars()");
   float *intensity = equalized ? counterIntensityEqualized : counterIntensity;
   SDL_SetRenderDrawColor(g_windowChild.renderer, 0, 0, 0, 255);
   float base_y = g_hist.rect.y + g_hist.rect.h - 1;
@@ -451,10 +550,12 @@ void renderHistogramBars() {
   SDL_SetRenderDrawColor(g_windowChild.renderer, 255, 0, 239, 255);
   SDL_RenderLine(g_windowChild.renderer, g_hist.rect.x, base_y, g_hist.rect.x + g_hist.rect.w, base_y);
   SDL_RenderLine(g_windowChild.renderer, g_hist.rect.x, g_hist.rect.y, g_hist.rect.x, base_y);
+  SDL_Log(">>> renderHistogramBars()");
 }
 
 
 void equalize(SDL_Surface *surface) {
+  SDL_Log("<<< equalize()");
   if (!surface) return;
   SDL_LockSurface(surface);
   Uint32 *pixel = (Uint32*)surface->pixels;
@@ -489,13 +590,16 @@ int cdf[256];
     counterIntensityEqualized[r] += 1.0f;
   }
   equalizedSurface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+  SDL_Log(">>> equalize()");
 }
+
 void loadHistogramButton() {
   createButton();
   createHistogram();
 }
 
 void countIntensity(SDL_Surface *surface) {
+  SDL_Log(">>> countIntensity()");
   if (!surface) return;
   for(int i = 0; i < 256; i++) {
       counterIntensity[i] = 0.0f;
@@ -511,16 +615,18 @@ void countIntensity(SDL_Surface *surface) {
       SDL_GetRGBA(pixels[i], format, NULL, &r, &g, &b, &a);
       if(equalized) counterIntensityEqualized[r]++;
       else counterIntensity[r]++;
-}
+  }
   
  SDL_UnlockSurface(surface);
   for(int i=0;i<256;i++) {
     if(equalized) counterIntensityEqualized[i] = (counterIntensityEqualized[i] / size) * 100.0f;
     else counterIntensity[i] = (counterIntensity[i] / size) * 100.0f;
   }
+  SDL_Log("<<< countIntensity()");
 }
 
 void analyzeImage(SDL_Surface *surface) {
+  SDL_Log(">>> analyzeImage()");
   if (!surface) return;
   SDL_LockSurface(surface);
   Uint32 *pixels = (Uint32*)surface->pixels;
@@ -547,11 +653,17 @@ void analyzeImage(SDL_Surface *surface) {
   if (stddev < 50) contrast = "Contraste: Baixo";
   else if (stddev < 100) contrast = "Contraste: Médio";
   else contrast = "Contraste: Alto";
+
+  SDL_Log("Média: %.2f (%s)", mean, brightness);
+  SDL_Log("Desvio padrão: %.2f (Contraste %s)", stddev, contrast);
 }
 
 void renderImageStats() {
   TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 14);
-  if (!font) return;
+  if (!font) {
+    SDL_Log("Erro ao carregar fonte: %s", SDL_GetError());
+    return;
+  }
 
   SDL_Surface *text_surface1 = TTF_RenderText_Blended(font, brightness, SDL_strlen(brightness), (SDL_Color){0,0,0,255});
   SDL_Texture *text_texture1 = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface1);
