@@ -524,3 +524,57 @@ void countIntensity(SDL_Surface *surface) {
     else counterIntensity[i] = (counterIntensity[i] / size) * 100.0f;
   }
 }
+
+void analyzeImage(SDL_Surface *surface) {
+  if (!surface) return;
+  SDL_LockSurface(surface);
+  Uint32 *pixels = (Uint32*)surface->pixels;
+  int size = surface->w * surface->h;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+
+  double sum = 0.0; double sum_sq = 0.0;
+  for (int i = 0; i < size; i++) {
+    Uint8 r, g, b, a;
+    SDL_GetRGBA(pixels[i], format, NULL, &r, &g, &b, &a);
+    sum += r;
+    sum_sq += r * r;
+  }
+  SDL_UnlockSurface(surface);
+
+  double mean = sum / size;
+  double variance = (sum_sq / size) - (mean * mean);
+  double stddev = sqrt(variance);
+
+  if (mean < 85) brightness = "Imagem: Escura";
+  else if (mean < 170) brightness = "Imagem: Média";
+  else brightness = "Imagem: Clara";
+
+  if (stddev < 50) contrast = "Contraste: Baixo";
+  else if (stddev < 100) contrast = "Contraste: Médio";
+  else contrast = "Contraste: Alto";
+}
+
+void renderImageStats() {
+  TTF_Font *font = TTF_OpenFont("font/Roboto-Regular.ttf", 14);
+  if (!font) return;
+
+  SDL_Surface *text_surface1 = TTF_RenderText_Blended(font, brightness, SDL_strlen(brightness), (SDL_Color){0,0,0,255});
+  SDL_Texture *text_texture1 = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface1);
+  SDL_Surface *text_surface2 = TTF_RenderText_Blended(font, contrast, SDL_strlen(contrast), (SDL_Color){0,0,0,255});
+  SDL_Texture *text_texture2 = SDL_CreateTextureFromSurface(g_windowChild.renderer, text_surface2);
+
+  int win_w, win_h;
+  SDL_GetWindowSize(g_windowChild.window, &win_w, &win_h);
+
+  SDL_FRect text_rect1 = { (win_w - text_surface1->w) / 2.0f, 10, text_surface1->w, text_surface1->h };
+  SDL_RenderTexture(g_windowChild.renderer, text_texture1, NULL, &text_rect1);
+  SDL_FRect text_rect2 = { (win_w - text_surface2->w) / 2.0f, 10 + text_surface1->h + 5, text_surface2->w, text_surface2->h };
+  SDL_RenderTexture(g_windowChild.renderer, text_texture2, NULL, &text_rect2);
+
+  SDL_DestroySurface(text_surface1);
+  SDL_DestroySurface(text_surface2);
+  SDL_DestroyTexture(text_texture1);
+  SDL_DestroyTexture(text_texture2);
+  TTF_CloseFont(font);
+}
+
