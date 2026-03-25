@@ -500,3 +500,19 @@ void loadHistogramButton() {
   createHistogram();
 }
 
+void countIntensity(SDL_Surface *surface) {
+  if (!surface) return;
+  for(int i = 0; i < 256; i++) {
+      counterIntensity[i] = 0.0f;
+      counterIntensityEqualized[i] = 0.0f;
+  }
+  SDL_LockSurface(surface);
+  Uint32 *pixels = (Uint32*)surface->pixels;
+  int size = surface->w * surface->h;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+
+  for(int i=0;i<size;i++) {
+      Uint8 r, g, b, a;
+      SDL_GetRGBA(pixels[i], format, NULL, &r, &g, &b, &a);
+      if(equalized) counterIntensityEqualized[r]++;
+      else counterIntensity[r]++;
