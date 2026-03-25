@@ -578,3 +578,18 @@ void renderImageStats() {
   TTF_CloseFont(font);
 }
 
+int main(int argc, char *argv[]) {
+    atexit(shutdown);
+    if(argc < 2) {
+        SDL_Log("Uso: %s <arquivo de imagem>", argv[0]);
+        return SDL_APP_FAILURE;
+    }
+    if (initialize() == SDL_APP_FAILURE) return SDL_APP_FAILURE;
+
+    IMAGE_FILENAME = argv[1];
+    loadImage(IMAGE_FILENAME, g_window.renderer, &g_image);
+    loadHistogramButton();
+    createWindow();
+    loop();
+    return 0;
+}
