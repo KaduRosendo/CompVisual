@@ -485,3 +485,5 @@ int cdf[256];
     Uint8 eq = lut[r];
     pixel[i] = SDL_MapRGBA(format, NULL, eq, eq, eq, a);
   }
+  SDL_UnlockSurface(surface);
+
