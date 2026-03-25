@@ -486,4 +486,17 @@ int cdf[256];
     pixel[i] = SDL_MapRGBA(format, NULL, eq, eq, eq, a);
   }
   SDL_UnlockSurface(surface);
+  
+ for(int i = 0; i < 256; i++) counterIntensityEqualized[i] = 0.0f;
+  for(int i = 0; i < size; i++) {
+    Uint8 r,g,b,a;
+    SDL_GetRGBA(pixel[i], format, NULL, &r, &g, &b, &a);
+    counterIntensityEqualized[r] += 1.0f;
+  }
+  equalizedSurface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+}
+void loadHistogramButton() {
+  createButton();
+  createHistogram();
+}
 
