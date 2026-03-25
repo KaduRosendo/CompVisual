@@ -472,4 +472,16 @@ void equalize(SDL_Surface *surface) {
     SDL_GetRGBA(pixel[i], format, NULL, &r, &g, &b, &a);
     hist[r]++; 
   }
+int cdf[256];
+  cdf[0] = hist[0];
+  for(int i = 1; i < 256; i++) cdf[i] = cdf[i-1] + hist[i];
 
+  Uint8 lut[256];
+  for(int i = 0; i < 256; i++) lut[i] = (Uint8)((cdf[i] * 255.0) / size + 0.05);
+
+  for(int i = 0; i < size; i++) {
+    Uint8 r,g,b,a;
+    SDL_GetRGBA(pixel[i], format, NULL, &r, &g, &b, &a);
+    Uint8 eq = lut[r];
+    pixel[i] = SDL_MapRGBA(format, NULL, eq, eq, eq, a);
+  }
