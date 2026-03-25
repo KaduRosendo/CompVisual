@@ -516,3 +516,11 @@ void countIntensity(SDL_Surface *surface) {
       SDL_GetRGBA(pixels[i], format, NULL, &r, &g, &b, &a);
       if(equalized) counterIntensityEqualized[r]++;
       else counterIntensity[r]++;
+}
+  
+ SDL_UnlockSurface(surface);
+  for(int i=0;i<256;i++) {
+    if(equalized) counterIntensityEqualized[i] = (counterIntensityEqualized[i] / size) * 100.0f;
+    else counterIntensity[i] = (counterIntensity[i] / size) * 100.0f;
+  }
+}
