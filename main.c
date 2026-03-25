@@ -17,7 +17,6 @@ Joao Pedro Gianfaldoni - 10409524
 #include <SDL3_ttf/SDL_ttf.h>
 #include <math.h>
 
-// Constants
 static const char *WINDOW_TITLE = "Tela Principal";
 static const char *WINDOW_TITLE2 = "Tela Secundária";
 static const char *BUTTON_TEXT_EQUALIZE = "Equalizar";
@@ -67,7 +66,6 @@ struct Histogram {
     SDL_FRect rect;
 };
 
-// Global variables
 float counterIntensity[256];
 float counterIntensityEqualized[256];
 bool equalized = false;
@@ -99,7 +97,6 @@ static Button g_button = {
 };
 static Histogram g_hist = { .rect = {0,0,0,0} };
 
-// Function declarations
 static bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags);
 static void MyWindow_destroy(MyWindow *window);
 static void MyImage_destroy(MyImage *image);
@@ -117,8 +114,6 @@ static void equalize(SDL_Surface *surface);
 static void createTextureSurface(SDL_Renderer *renderer);
 static void analyzeImage(SDL_Surface *surface);
 static void renderImageStats();
-
-// Function implementations
 
 bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags) {
   SDL_Log("\tMyWindow_initialize(%s, %d, %d)", title, width, height);
